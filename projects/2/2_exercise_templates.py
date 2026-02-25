@@ -17,7 +17,7 @@ class Curso:
 
 
 # globals
-list_areas_user = []
+list_areas_user: list[Curso] = []
 history_messages = []
 system_prompts = []
 
@@ -40,6 +40,19 @@ prompt_template_area = PromptTemplate(
     input_variables=["area"],
 )
 
+
+prompt_template_curso = PromptTemplate(
+    template="""
+    Eres un instructor que aconsejo a sus estudiantes que cursos se toma mas a importancia para aprobar el area.
+
+    Algo minimo donde el estudiante pueda enfocarse mas segun su calificacion.
+
+    El area que lleva es {area} con promedio de nota de {nota_promedio} y sus cursos son:
+    {cursos}
+    """,
+    input_variables=["area", "cursos", "nota_promedio"],
+)
+
 chat_prompt_template = ChatPromptTemplate.from_messages(
     [
         (
@@ -57,6 +70,7 @@ chat_prompt_template = ChatPromptTemplate.from_messages(
 # chains
 chain_area = prompt_template_area | llm
 chain_chat = chat_prompt_template | llm
+chain_cursos = prompt_template_curso | llm
 
 
 # AI functions
@@ -67,16 +81,24 @@ def generar_temas(area: str):
 
     # con chain
     response = chain_area.invoke({"area": area})
-    data = json.loads(response.content)
-    return data["cursos"]
+
+    try:
+        data = json.loads(response.content)
+        return data["cursos"]
+    except Exception:
+        print("Error parseando respuesta del modelo")
+        return []
 
 
 # helpers
 def user_options(key_exit: int | None) -> int:
-    key_result = int(input("Selección: "))
-    if key_result != key_exit:
-        return key_result
-    return 0
+    try:
+        key_result = int(input("Selección: "))
+        if key_result != key_exit:
+            return key_result
+        return 0
+    except ValueError:
+        return 100
 
 
 def print_list_enumerable(list):
@@ -89,7 +111,13 @@ def init():
     print(title)
 
     track_state = True
-    operation_task = ["Agregar tarea", "Ver tareas", "Generar plan con IA", "Salir"]
+    operation_task = [
+        "Agregar tarea",
+        "Ver tareas",
+        "Pide consejos a un Instructor AI",
+        "Generar plan con IA",
+        "Salir",
+    ]
 
     while track_state:
         print_list_enumerable(operation_task)
@@ -98,6 +126,10 @@ def init():
 
         if val == 0:
             track_state = False
+
+        if val == 100:
+            print("Opcion invalida, seleccione otra\n")
+            continue
 
         print(operation_task[val - 1])
 
@@ -129,19 +161,38 @@ def init():
                     print(f"Nota Promedio: {item.nota_promedio}")
 
                 user_seleccion = int(input("Selecciona un curso: ")) - 1
-                print(list_areas_user[user_seleccion])
 
-                print("Generando resumen del curso seleccionado..")
-                question = f"Quiero que me recomiendes como poder mejorar mi nota de este curso:\n{list_areas_user[user_seleccion]}"
-                print("User: ", question)
-                response = chain_chat.invoke(
-                    {"historial": history_messages, "pregunta": question}
+                print("El instructor analizara el curso seleccionado..")
+                # question = f"Quiero que me recomiendes como poder mejorar mi nota de este curso:\n{list_areas_user[user_seleccion]}"
+                # print("User: ", question)
+                user_seleccion = list_areas_user[user_seleccion]
+                response = chain_cursos.invoke(
+                    {
+                        "area": user_seleccion.area,
+                        "cursos": "\n-".join(user_seleccion.cursos),
+                        "nota_promedio": user_seleccion.nota_promedio,
+                    }
                 ).content
 
                 history_messages.append(response)
+                print(
+                    f"User: {user_seleccion.area}, cursos: {', '.join(user_seleccion.cursos)}"
+                )
+                print("-" * 20)
                 print("Instructor: ", response)
 
                 pass
+            case 4:
+                print("Question:")
+                user_question = input("User: ")
+
+                response = chain_chat.invoke(
+                    {"historial": history_messages, "pregunta": user_question}
+                ).content
+
+                print("User: ", user_question)
+                print("-" * 20)
+                print("Instructor: ", response)
 
 
 if __name__ == "__main__":
