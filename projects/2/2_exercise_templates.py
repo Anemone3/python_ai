@@ -1,5 +1,9 @@
 from langchain_openai import ChatOpenAI
-from langchain_core.prompts import PromptTemplate, ChatPromptTemplate
+from langchain_core.prompts import (
+    PromptTemplate,
+    ChatPromptTemplate,
+    MessagesPlaceholder,
+)
 
 import random
 import json
@@ -59,9 +63,10 @@ chat_prompt_template = ChatPromptTemplate.from_messages(
             "system",
             "Eres un instructor de varias profesiones, y tienes el trabajo de poder ayudar a los estudiantes segun el area que necesitan apoyo",
         ),
+        MessagesPlaceholder(variable_name="historial"),
         (
             "human",
-            "Historial de conversación: {historial}.\\nPregunta actual: {pregunta}",
+            "Pregunta actual: {pregunta}",
         ),
     ]
 )
